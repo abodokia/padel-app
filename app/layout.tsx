@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { AppProviders } from "@/components/providers";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -38,7 +37,8 @@ export default function RootLayout({
         className="flex min-h-full flex-col bg-[#F2F2F7] text-stone-900 selection:bg-blue-100"
         suppressHydrationWarning
       >
-        <AppProviders>{children}</AppProviders>
+        {/* აქ აღარ გვაქვს <AppProviders>, რომ არაფერმა არ დაგვიბლოკოს საიტი */}
+        {children}
       </body>
     </html>
   );
