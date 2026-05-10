@@ -1,74 +1,43 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useSyncExternalStore,
-} from "react";
-import type { AuthResult, MockUser } from "@/lib/mock-db";
-import {
-  getCurrentUser,
-  getSessionUserId,
-  mockLogin,
-  mockLogout,
-  mockRegister,
-  subscribeMockStore,
-} from "@/lib/mock-db";
+import { createContext, useContext, useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client"; // დარწმუნდი რომ ეს ფაილი გაქვს
 
-type AuthContextValue = {
-  user: MockUser | null;
-  login: (email: string, password: string) => Promise<AuthResult>;
-  register: (
-    email: string,
-    password: string,
-    displayName?: string,
-  ) => Promise<AuthResult>;
-  logout: () => Promise<void>;
-};
-
-const AuthContext = createContext<AuthContextValue | null>(null);
+const AuthContext = createContext<{ user: any | null; loading: boolean }>({
+  user: null,
+  loading: true,
+});
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const sessionUserId = useSyncExternalStore(
-    subscribeMockStore,
-    () => getSessionUserId() ?? "",
-    () => "",
-  );
+  const [user, setUser] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
 
-  const user = useMemo((): MockUser | null => {
-    if (!sessionUserId) return null;
-    return getCurrentUser();
-  }, [sessionUserId]);
+  useEffect(() => {
+    // 1. შევამოწმოთ არსებული სესია
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
 
-  const login = useCallback((email: string, password: string) => {
-    return mockLogin(email, password);
-  }, []);
+    // 2. მოვუსმინოთ ცვლილებებს (login/logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
 
-  const register = useCallback(
-    (email: string, password: string, displayName?: string) => {
-      return mockRegister(email, password, displayName);
-    },
-    [],
-  );
-
-  const logout = useCallback(() => {
-    return mockLogout();
-  }, []);
-
-  const value = useMemo(
-    () => ({ user, login, register, logout }),
-    [user, login, register, logout],
-  );
+    return () => subscription.unsubscribe();
+  }, [supabase]);
 
   return (
-    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ user, loading }}>
+      {children}
+    </AuthContext.Provider>
   );
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
-  return ctx;
+  const context = useContext(AuthContext);
+  if (!context) throw new Error("useAuth must be used within AuthProvider");
+  return context;
 }
